@@ -1,6 +1,7 @@
 """
-Vercel (and other hosts) expect a Flask ``app`` in one of a few standard filenames.
-The real app lives in ``web_app``; this module re-exports it.
+Vercel expects a module-level ``app`` in ``app.py``, ``main.py``, etc.
+Also see ``main.py`` (used in Vercel's official Flask example).
+https://vercel.com/docs/frameworks/backend/flask
 """
 
 from web_app import app

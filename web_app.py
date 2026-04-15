@@ -9,6 +9,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+import tempfile
 import threading
 import traceback
 import uuid
@@ -34,8 +35,38 @@ from run_leads import (
 
 ROOT = Path(__file__).resolve().parent
 load_project_env(ROOT)
-OUT_DIR = ROOT / "web_output"
-OUT_DIR.mkdir(exist_ok=True)
+
+
+def _resolve_out_dir() -> Path:
+    """
+    Writable directory for uploads and CSV output.
+
+    Vercel (and similar) mount ``/var/task`` read-only; only e.g. ``/tmp`` is writable.
+    We also fall back when the project root is not writable, so this works even if
+    ``VERCEL`` is unset during import.
+    """
+    override = (os.environ.get("LEADGEN_OUT_DIR") or "").strip()
+    if override:
+        return Path(override)
+
+    tmp_out = Path(os.environ.get("TMPDIR", tempfile.gettempdir())) / "leadgen_web_output"
+
+    if os.environ.get("VERCEL") or (os.environ.get("AWS_LAMBDA_FUNCTION_NAME") or "").strip():
+        return tmp_out
+    try:
+        if not os.access(str(ROOT), os.W_OK):
+            return tmp_out
+    except OSError:
+        return tmp_out
+    return ROOT / "web_output"
+
+
+OUT_DIR = _resolve_out_dir()
+try:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    OUT_DIR = Path(os.environ.get("TMPDIR", tempfile.gettempdir())) / "leadgen_web_output"
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__, template_folder=str(ROOT / "templates"), static_folder=str(ROOT / "static"))
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024  # 2 MB uploads
